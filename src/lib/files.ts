@@ -23,9 +23,15 @@ export type LoadedDocument = {
 };
 
 function uploadRoot(): string {
-  return process.env.UPLOAD_DIR
-    ? path.resolve(process.env.UPLOAD_DIR)
-    : path.join(process.cwd(), "uploads");
+  if (process.env.UPLOAD_DIR) {
+    return path.resolve(process.env.UPLOAD_DIR);
+  }
+
+  if (process.env.VERCEL) {
+    return "/tmp/cmd-registration-uploads";
+  }
+
+  return path.join(process.cwd(), "uploads");
 }
 
 function sanitizeFileName(fileName: string): string {
