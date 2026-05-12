@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Registration {
+  id                  String                 @id @default(cuid())
+  referenceCode       String                 @unique
+  name                String
+  email               String
+  phone               String
+  organization        String?
+  jobTitle            String?
+  dietaryRequirements String?
+  notes               String?
+  passwordHash        String
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  documents           RegistrationDocument[]
+}
+
+model RegistrationDocument {
+  id             String       @id @default(cuid())
+  registrationId String
+  fileName       String
+  storagePath    String
+  mimeType       String
+  size           Int
+  uploadedAt     DateTime     @default(now())
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@index([registrationId])
+}

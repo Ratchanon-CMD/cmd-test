@@ -39,3 +39,72 @@ Admin can:
 
 - **Reference code** — รหัสที่ระบบให้ผู้ใช้หลังลงทะเบียน ใช้กลับเข้ามาแก้ไขได้
 - **Tag** — ป้ายชื่อผู้ลงทะเบียน (ในที่นี้คือ PDF ไม่ใช่กระดาษจริง)
+
+---
+
+## Implementation
+
+This repo implements the event registration system as a single Next.js app with user pages, admin pages, and API routes in the same project.
+
+### Stack
+
+- Next.js App Router + React + TypeScript
+- Tailwind CSS
+- Prisma + SQLite
+- bcryptjs for participant password hashing
+- Signed HTTP-only cookies for participant/admin sessions
+- Local file storage under `uploads/`
+- PDFKit for name tag PDF generation
+- Vitest for focused tests
+
+### Local setup
+
+```bash
+npm install
+cp .env.example .env
+npx prisma db push
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+Default local admin credentials from `.env`:
+
+```text
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin12345
+```
+
+Change these before deployment.
+
+### Required environment variables
+
+```text
+DATABASE_URL="file:./dev.db"
+SESSION_SECRET="replace-with-a-long-random-secret"
+ADMIN_USERNAME="admin"
+ADMIN_PASSWORD="change-me"
+NEXT_PUBLIC_APP_NAME="CMD Event Registration"
+```
+
+### Main flows
+
+1. User opens `/register`, submits registration details, sets a password, and uploads multiple supporting documents.
+2. System returns a `referenceCode`.
+3. User opens `/lookup`, enters `referenceCode` and password, then views or edits their submission.
+4. User can add more documents or replace all existing documents.
+5. Admin opens `/admin/login` and logs in using `.env` credentials.
+6. Admin opens `/admin/registrations`, reviews all submissions, opens details, downloads documents, and downloads a PDF name tag.
+
+### Useful commands
+
+```bash
+npm run dev
+npm run type-check
+npm run test
+npm run build
+```
+
+### Deployment note
+
+The current implementation uses SQLite and local file storage for fast delivery. Deploy it to a target that supports persistent disk storage, or replace the storage/database layer with managed PostgreSQL and S3-compatible storage before deploying to stateless platforms.
