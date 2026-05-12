@@ -13,7 +13,9 @@ type PageProps = {
   };
 };
 
-export default async function AdminRegistrationsPage({ searchParams }: PageProps) {
+export default async function AdminRegistrationsPage({
+  searchParams,
+}: PageProps) {
   const admin = getAdminSessionSubject();
 
   if (!admin) {
@@ -27,16 +29,16 @@ export default async function AdminRegistrationsPage({ searchParams }: PageProps
           OR: [
             { referenceCode: { contains: query } },
             { name: { contains: query } },
-            { email: { contains: query } }
-          ]
+            { email: { contains: query } },
+          ],
         }
       : undefined,
     include: {
-      documents: true
+      documents: true,
     },
     orderBy: {
-      createdAt: "desc"
-    }
+      createdAt: "desc",
+    },
   });
 
   return (
@@ -51,7 +53,10 @@ export default async function AdminRegistrationsPage({ searchParams }: PageProps
         <AdminLogoutButton />
       </div>
 
-      <form className="surface flex flex-col gap-3 p-4 md:flex-row" action="/admin/registrations">
+      <form
+        className="surface flex flex-col gap-3 p-4 md:flex-row"
+        action="/admin/registrations"
+      >
         <input
           className="field-input"
           name="q"
@@ -118,7 +123,10 @@ export default async function AdminRegistrationsPage({ searchParams }: PageProps
               ))}
               {registrations.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-slate-500" colSpan={6}>
+                  <td
+                    className="px-4 py-8 text-center text-slate-500"
+                    colSpan={6}
+                  >
                     No registrations found.
                   </td>
                 </tr>
