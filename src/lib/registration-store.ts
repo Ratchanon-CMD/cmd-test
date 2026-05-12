@@ -451,9 +451,13 @@ function blobAccess(): BlobAccessType {
 }
 
 function isPublicStoreAccessError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
   return (
-    error instanceof Error &&
-    error.message.includes("Cannot use private access on a public store")
+    error.message.includes("Cannot use private access on a public store") ||
+    error.message.includes("Failed to fetch blob: 400 Bad Request")
   );
 }
 
