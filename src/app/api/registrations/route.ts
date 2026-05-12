@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
     const registration = await createRegistration(parsed.data, uploadedFiles);
 
     return jsonSuccess(registration, "Registration submitted", 201);
-  } catch {
+  } catch (error) {
+    console.error("Could not create registration", error);
     return jsonError("Could not create registration", 500);
   }
 }

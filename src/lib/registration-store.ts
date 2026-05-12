@@ -573,11 +573,24 @@ async function listBlobRegistrations(
   query?: string,
 ): Promise<StoredRegistration[]> {
   const pathnames = await listBlobRegistrationPathnames();
-  const registrations = (
-    await Promise.all(pathnames.map((pathname) => getBlobJson(pathname)))
-  ).filter((registration): registration is StoredRegistration =>
-    Boolean(registration),
+  const results = await Promise.allSettled(
+    pathnames.map((pathname) => getBlobJson(pathname)),
   );
+  const registrations = results
+    .map((result, index) => {
+      if (result.status === "fulfilled") {
+        return result.value;
+      }
+
+      console.warn(
+        `Skipping unreadable registration blob: ${pathnames[index]}`,
+        result.reason,
+      );
+      return null;
+    })
+    .filter((registration): registration is StoredRegistration =>
+      Boolean(registration),
+    );
   const normalizedQuery = query?.trim().toLowerCase();
   const filteredRegistrations = normalizedQuery
     ? registrations.filter((registration) =>
