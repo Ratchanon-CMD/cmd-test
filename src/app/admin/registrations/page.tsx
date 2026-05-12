@@ -5,6 +5,8 @@ import { AdminLogoutButton } from "@/components/AdminLogoutButton";
 import { getAdminSessionSubject } from "@/lib/cookies";
 import { prisma } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 type PageProps = {
   searchParams: {
     q?: string;

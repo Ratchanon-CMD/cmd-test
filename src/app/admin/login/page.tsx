@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { getAdminSessionSubject } from "@/lib/cookies";
 
+export const dynamic = "force-dynamic";
+
 export default function AdminLoginPage() {
   const admin = getAdminSessionSubject();
 

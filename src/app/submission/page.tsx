@@ -5,6 +5,8 @@ import { getSubmissionReferenceFromSession } from "@/lib/cookies";
 import { prisma } from "@/lib/db";
 import { serializeRegistration } from "@/lib/serializers";
 
+export const dynamic = "force-dynamic";
+
 export default async function SubmissionPage() {
   const referenceCode = getSubmissionReferenceFromSession();
 
