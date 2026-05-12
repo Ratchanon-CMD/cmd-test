@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
 
-import { prisma } from "@/lib/db";
-import { loadStoredDocument } from "@/lib/files";
+import {
+  findRegistrationDocument,
+  loadRegistrationDocument,
+} from "@/lib/registration-store";
 import { jsonError } from "@/lib/responses";
 import {
   ADMIN_COOKIE,
   SUBMISSION_COOKIE,
-  verifySessionToken
+  verifySessionToken,
 } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -18,44 +20,40 @@ type RouteParams = {
 };
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
-  const document = await prisma.registrationDocument.findUnique({
-    where: { id: params.id },
-    include: {
-      registration: true
-    }
-  });
+  const lookup = await findRegistrationDocument(params.id);
 
-  if (!document) {
+  if (!lookup) {
     return jsonError("Document not found", 404);
   }
 
   const adminSubject = verifySessionToken(
     request.cookies.get(ADMIN_COOKIE)?.value,
-    "admin"
+    "admin",
   )?.subject;
   const submissionSubject = verifySessionToken(
     request.cookies.get(SUBMISSION_COOKIE)?.value,
-    "submission"
+    "submission",
   )?.subject;
   const canDownload =
-    Boolean(adminSubject) || submissionSubject === document.registration.referenceCode;
+    Boolean(adminSubject) ||
+    submissionSubject === lookup.registration.referenceCode;
 
   if (!canDownload) {
     return jsonError("Unauthorized", 401);
   }
 
-  const loaded = await loadStoredDocument(
-    document.storagePath,
-    document.fileName,
-    document.mimeType
-  );
+  const loaded = await loadRegistrationDocument(params.id);
+
+  if (!loaded) {
+    return jsonError("Document not found", 404);
+  }
 
   return new Response(new Uint8Array(loaded.buffer), {
     headers: {
-      "Content-Type": loaded.mimeType,
+      "Content-Type": loaded.document.mimeType,
       "Content-Disposition": `attachment; filename="${encodeURIComponent(
-        loaded.fileName
-      )}"`
-    }
+        loaded.document.fileName,
+      )}"`,
+    },
   });
 }

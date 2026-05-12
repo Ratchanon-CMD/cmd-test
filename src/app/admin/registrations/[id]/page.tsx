@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { AdminLogoutButton } from "@/components/AdminLogoutButton";
 import { getAdminSessionSubject } from "@/lib/cookies";
+import { findRegistrationById } from "@/lib/registration-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -25,26 +26,16 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default async function AdminRegistrationDetailPage({ params }: PageProps) {
+export default async function AdminRegistrationDetailPage({
+  params,
+}: PageProps) {
   const admin = getAdminSessionSubject();
 
   if (!admin) {
     redirect("/admin/login");
   }
 
-  const { prisma } = await import("@/lib/db");
-  const registration = await prisma.registration.findUnique({
-    where: {
-      id: params.id
-    },
-    include: {
-      documents: {
-        orderBy: {
-          uploadedAt: "desc"
-        }
-      }
-    }
-  });
+  const registration = await findRegistrationById(params.id);
 
   if (!registration) {
     notFound();
@@ -108,7 +99,7 @@ export default async function AdminRegistrationDetailPage({ params }: PageProps)
         <div>
           <p className="field-label">Submitted</p>
           <p className="font-semibold text-slate-950">
-            {registration.createdAt.toLocaleString()}
+            {new Date(registration.createdAt).toLocaleString()}
           </p>
         </div>
         <div className="md:col-span-2">

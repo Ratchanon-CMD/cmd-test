@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 
 import { AdminLogoutButton } from "@/components/AdminLogoutButton";
 import { getAdminSessionSubject } from "@/lib/cookies";
+import {
+  isEphemeralVercelStorage,
+  listRegistrations,
+} from "@/lib/registration-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,24 +27,7 @@ export default async function AdminRegistrationsPage({
   }
 
   const query = searchParams.q?.trim();
-  const { prisma } = await import("@/lib/db");
-  const registrations = await prisma.registration.findMany({
-    where: query
-      ? {
-          OR: [
-            { referenceCode: { contains: query } },
-            { name: { contains: query } },
-            { email: { contains: query } },
-          ],
-        }
-      : undefined,
-    include: {
-      documents: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  const registrations = await listRegistrations(query);
 
   return (
     <div className="grid gap-6">
@@ -66,6 +53,13 @@ export default async function AdminRegistrationsPage({
         />
         <button className="button-primary md:w-32">Search</button>
       </form>
+
+      {isEphemeralVercelStorage() ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+          Production storage is not configured. Add a Vercel Blob store so
+          registrations persist across Vercel serverless functions.
+        </div>
+      ) : null}
 
       <section className="surface overflow-hidden">
         <div className="overflow-x-auto">
@@ -102,7 +96,7 @@ export default async function AdminRegistrationsPage({
                     {registration.documents.length}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
-                    {registration.createdAt.toLocaleString()}
+                    {new Date(registration.createdAt).toLocaleString()}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">

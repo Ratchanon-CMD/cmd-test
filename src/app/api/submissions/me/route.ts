@@ -1,8 +1,11 @@
 import { NextRequest } from "next/server";
 
-import { prisma } from "@/lib/db";
+import {
+  findRegistrationByReferenceCode,
+  serializeStoredRegistration,
+  updateRegistrationByReferenceCode,
+} from "@/lib/registration-store";
 import { jsonError, jsonSuccess } from "@/lib/responses";
-import { serializeRegistration } from "@/lib/serializers";
 import { SUBMISSION_COOKIE, verifySessionToken } from "@/lib/session";
 import { registrationUpdateSchema } from "@/lib/validation";
 
@@ -20,22 +23,13 @@ export async function GET(request: NextRequest) {
     return jsonError("Unauthorized", 401);
   }
 
-  const registration = await prisma.registration.findUnique({
-    where: { referenceCode },
-    include: {
-      documents: {
-        orderBy: {
-          uploadedAt: "desc"
-        }
-      }
-    }
-  });
+  const registration = await findRegistrationByReferenceCode(referenceCode);
 
   if (!registration) {
     return jsonError("Registration not found", 404);
   }
 
-  return jsonSuccess(serializeRegistration(registration));
+  return jsonSuccess(serializeStoredRegistration(registration));
 }
 
 export async function PATCH(request: NextRequest) {
@@ -50,21 +44,18 @@ export async function PATCH(request: NextRequest) {
 
   if (!parsed.success) {
     return jsonError("Invalid registration data", 422, {
-      issues: parsed.error.flatten().fieldErrors
+      issues: parsed.error.flatten().fieldErrors,
     });
   }
 
-  const registration = await prisma.registration.update({
-    where: { referenceCode },
-    data: parsed.data,
-    include: {
-      documents: {
-        orderBy: {
-          uploadedAt: "desc"
-        }
-      }
-    }
-  });
+  const registration = await updateRegistrationByReferenceCode(
+    referenceCode,
+    parsed.data,
+  );
 
-  return jsonSuccess(serializeRegistration(registration), "Registration updated");
+  if (!registration) {
+    return jsonError("Registration not found", 404);
+  }
+
+  return jsonSuccess(registration, "Registration updated");
 }

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 
-import { prisma } from "@/lib/db";
 import { createNameTagPdf } from "@/lib/pdf";
+import { findRegistrationById } from "@/lib/registration-store";
 import { jsonError } from "@/lib/responses";
 import { ADMIN_COOKIE, verifySessionToken } from "@/lib/session";
 
@@ -16,18 +16,14 @@ type RouteParams = {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const admin = verifySessionToken(
     request.cookies.get(ADMIN_COOKIE)?.value,
-    "admin"
+    "admin",
   );
 
   if (!admin) {
     return jsonError("Unauthorized", 401);
   }
 
-  const registration = await prisma.registration.findUnique({
-    where: {
-      id: params.id
-    }
-  });
+  const registration = await findRegistrationById(params.id);
 
   if (!registration) {
     return jsonError("Registration not found", 404);
@@ -38,13 +34,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     referenceCode: registration.referenceCode,
     name: registration.name,
     organization: registration.organization,
-    jobTitle: registration.jobTitle
+    jobTitle: registration.jobTitle,
   });
 
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="name-tag-${registration.referenceCode}.pdf"`
-    }
+      "Content-Disposition": `attachment; filename="name-tag-${registration.referenceCode}.pdf"`,
+    },
   });
 }

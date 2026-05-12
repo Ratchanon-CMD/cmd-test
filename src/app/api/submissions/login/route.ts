@@ -1,9 +1,11 @@
 import { NextRequest } from "next/server";
 
-import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
+import {
+  findRegistrationByReferenceCode,
+  serializeStoredRegistration,
+} from "@/lib/registration-store";
 import { jsonError, jsonSuccess } from "@/lib/responses";
-import { serializeRegistration } from "@/lib/serializers";
 import { createSessionToken, SUBMISSION_COOKIE } from "@/lib/session";
 import { submissionLoginSchema } from "@/lib/validation";
 
@@ -19,18 +21,9 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const registration = await prisma.registration.findUnique({
-    where: {
-      referenceCode: parsed.data.referenceCode.trim().toUpperCase(),
-    },
-    include: {
-      documents: {
-        orderBy: {
-          uploadedAt: "desc",
-        },
-      },
-    },
-  });
+  const registration = await findRegistrationByReferenceCode(
+    parsed.data.referenceCode,
+  );
 
   if (!registration) {
     return jsonError("Invalid reference code or password", 401);
@@ -46,7 +39,7 @@ export async function POST(request: NextRequest) {
   }
 
   const response = jsonSuccess(
-    serializeRegistration(registration),
+    serializeStoredRegistration(registration),
     "Submission unlocked",
   );
 

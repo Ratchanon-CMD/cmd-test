@@ -11,6 +11,7 @@ An event registration system.
 - Tests. Pick what would matter if this were a real event with real people. Can be any kind of test written by code.
 
 User can:
+
 - Submit a registration form with name, email, phone, and any other fields a real event would ask for.
 - Upload multiple supporting documents.
 - Set a password at submission time.
@@ -19,6 +20,7 @@ User can:
 - Edit any field, replace documents, add new documents.
 
 Admin can:
+
 - Log in with username and password from `.env`.
 - See the list of all registrations.
 - Click any registration to see its details.
@@ -85,7 +87,13 @@ SESSION_SECRET="replace-with-a-long-random-secret"
 ADMIN_USERNAME="admin"
 ADMIN_PASSWORD="change-me"
 NEXT_PUBLIC_APP_NAME="CMD Event Registration"
+BLOB_READ_WRITE_TOKEN=""
+BLOB_ACCESS="private"
 ```
+
+For Vercel production, connect a Vercel Blob store to the project so
+`BLOB_READ_WRITE_TOKEN` is set. Without it, Vercel only has ephemeral `/tmp`
+storage and registrations may not appear across different routes.
 
 ### Main flows
 
@@ -107,4 +115,7 @@ npm run build
 
 ### Deployment note
 
-The current implementation uses SQLite and local file storage for fast delivery. Deploy it to a target that supports persistent disk storage, or replace the storage/database layer with managed PostgreSQL and S3-compatible storage before deploying to stateless platforms.
+The app uses SQLite and local file storage for local development. On Vercel,
+it uses Vercel Blob when `BLOB_READ_WRITE_TOKEN` is configured, storing both
+registration metadata and uploaded documents in Blob storage. Deployments
+without a persistent storage integration will show a warning in the admin list.
