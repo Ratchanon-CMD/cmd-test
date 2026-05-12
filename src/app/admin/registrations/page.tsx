@@ -3,9 +3,9 @@ import { redirect } from "next/navigation";
 
 import { AdminLogoutButton } from "@/components/AdminLogoutButton";
 import { getAdminSessionSubject } from "@/lib/cookies";
-import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type PageProps = {
   searchParams: {
@@ -23,6 +23,7 @@ export default async function AdminRegistrationsPage({
   }
 
   const query = searchParams.q?.trim();
+  const { prisma } = await import("@/lib/db");
   const registrations = await prisma.registration.findMany({
     where: query
       ? {

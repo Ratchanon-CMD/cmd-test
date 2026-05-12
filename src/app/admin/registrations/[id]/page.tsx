@@ -3,9 +3,9 @@ import { notFound, redirect } from "next/navigation";
 
 import { AdminLogoutButton } from "@/components/AdminLogoutButton";
 import { getAdminSessionSubject } from "@/lib/cookies";
-import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type PageProps = {
   params: {
@@ -32,6 +32,7 @@ export default async function AdminRegistrationDetailPage({ params }: PageProps)
     redirect("/admin/login");
   }
 
+  const { prisma } = await import("@/lib/db");
   const registration = await prisma.registration.findUnique({
     where: {
       id: params.id

@@ -2,10 +2,10 @@ import { redirect } from "next/navigation";
 
 import { SubmissionEditor } from "@/components/SubmissionEditor";
 import { getSubmissionReferenceFromSession } from "@/lib/cookies";
-import { prisma } from "@/lib/db";
 import { serializeRegistration } from "@/lib/serializers";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export default async function SubmissionPage() {
   const referenceCode = getSubmissionReferenceFromSession();
@@ -14,6 +14,7 @@ export default async function SubmissionPage() {
     redirect("/lookup");
   }
 
+  const { prisma } = await import("@/lib/db");
   const registration = await prisma.registration.findUnique({
     where: {
       referenceCode

@@ -2,9 +2,13 @@
   "name": "cmd-ai-adoption-exam-register-system",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "next dev",
-    "prebuild": "rm -rf .next",
+    "postinstall": "prisma generate",
+    "prebuild": "rm -rf .next && prisma generate",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
