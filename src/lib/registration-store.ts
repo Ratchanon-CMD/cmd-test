@@ -1,4 +1,10 @@
-import { randomUUID } from "crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+  randomUUID,
+} from "crypto";
 
 import { del, get, list, put, type BlobAccessType } from "@vercel/blob";
 import type { Prisma } from "@prisma/client";
@@ -19,6 +25,7 @@ import type {
 const BLOB_REGISTRATION_PREFIX = "registrations/";
 const BLOB_DOCUMENT_PREFIX = "documents/";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const ENCRYPTED_PAYLOAD_VERSION = 1;
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
   "image/jpeg",
@@ -51,6 +58,15 @@ type RegistrationDocumentLookup = {
   registration: StoredRegistration;
   document: StoredDocumentView;
 };
+
+type EncryptedPayload = {
+  version: typeof ENCRYPTED_PAYLOAD_VERSION;
+  iv: string;
+  tag: string;
+  data: string;
+};
+
+let resolvedBlobAccess: BlobAccessType | null = null;
 
 export function isBlobStoreEnabled(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
@@ -313,8 +329,7 @@ export async function loadRegistrationDocument(
   }
 
   if (isBlobStoreEnabled()) {
-    const blob = await get(lookup.document.storagePath, {
-      access: blobAccess(),
+    const blob = await getBlob(lookup.document.storagePath, {
       useCache: false,
     });
 
@@ -324,7 +339,7 @@ export async function loadRegistrationDocument(
 
     return {
       ...lookup,
-      buffer: await streamToBuffer(blob.stream),
+      buffer: decryptBuffer(await streamToBuffer(blob.stream)),
     };
   }
 
@@ -428,6 +443,62 @@ async function createLocalRegistration(
 
 function blobAccess(): BlobAccessType {
   return process.env.BLOB_ACCESS === "public" ? "public" : "private";
+}
+
+function isPublicStoreAccessError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.includes("Cannot use private access on a public store")
+  );
+}
+
+async function withBlobAccess<T>(
+  operation: (access: BlobAccessType) => Promise<T>,
+): Promise<T> {
+  const preferredAccess = resolvedBlobAccess ?? blobAccess();
+
+  try {
+    const result = await operation(preferredAccess);
+    resolvedBlobAccess = preferredAccess;
+    return result;
+  } catch (error) {
+    if (preferredAccess === "private" && isPublicStoreAccessError(error)) {
+      resolvedBlobAccess = "public";
+      return operation("public");
+    }
+
+    throw error;
+  }
+}
+
+async function getBlob(
+  pathname: string,
+  options: { useCache?: boolean } = {},
+): ReturnType<typeof get> {
+  return withBlobAccess((access) =>
+    get(pathname, {
+      access,
+      useCache: options.useCache,
+    }),
+  );
+}
+
+async function putBlob(
+  pathname: string,
+  body: Buffer | string,
+  options: {
+    allowOverwrite: boolean;
+    contentType: string;
+  },
+): ReturnType<typeof put> {
+  return withBlobAccess((access) =>
+    put(pathname, body, {
+      access,
+      addRandomSuffix: false,
+      allowOverwrite: options.allowOverwrite,
+      contentType: options.contentType,
+    }),
+  );
 }
 
 function blobRegistrationPath(id: string): string {
@@ -617,12 +688,10 @@ async function saveBlobRegistration(
   registration: StoredRegistration,
   allowOverwrite: boolean,
 ): Promise<void> {
-  await put(
+  await putBlob(
     blobRegistrationPath(registration.id),
-    JSON.stringify(registration),
+    encryptText(JSON.stringify(registration)),
     {
-      access: blobAccess(),
-      addRandomSuffix: false,
       allowOverwrite,
       contentType: "application/json",
     },
@@ -632,8 +701,7 @@ async function saveBlobRegistration(
 async function getBlobJson(
   pathname: string,
 ): Promise<StoredRegistration | null> {
-  const blob = await get(pathname, {
-    access: blobAccess(),
+  const blob = await getBlob(pathname, {
     useCache: false,
   });
 
@@ -642,7 +710,7 @@ async function getBlobJson(
   }
 
   return JSON.parse(
-    (await streamToBuffer(blob.stream)).toString("utf8"),
+    decryptText((await streamToBuffer(blob.stream)).toString("utf8")),
   ) as StoredRegistration;
 }
 
@@ -660,11 +728,9 @@ async function saveBlobUploadedDocuments(
       file.name,
     )}`;
     const buffer = Buffer.from(await file.arrayBuffer());
-    await put(pathname, buffer, {
-      access: blobAccess(),
-      addRandomSuffix: false,
+    await putBlob(pathname, encryptBuffer(buffer), {
       allowOverwrite: false,
-      contentType: file.type,
+      contentType: "application/octet-stream",
     });
 
     documents.push({
@@ -692,6 +758,73 @@ function validateUploadedFile(file: File): void {
 
 function sanitizeFileName(fileName: string): string {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+function encryptionKey(): Buffer {
+  return createHash("sha256")
+    .update(process.env.SESSION_SECRET || "dev-only-session-secret-change-me")
+    .digest();
+}
+
+function encryptBuffer(buffer: Buffer): Buffer {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(buffer), cipher.final()]);
+  const payload: EncryptedPayload = {
+    version: ENCRYPTED_PAYLOAD_VERSION,
+    iv: iv.toString("base64url"),
+    tag: cipher.getAuthTag().toString("base64url"),
+    data: encrypted.toString("base64url"),
+  };
+
+  return Buffer.from(JSON.stringify(payload), "utf8");
+}
+
+function decryptBuffer(buffer: Buffer): Buffer {
+  const payload = parseEncryptedPayload(buffer.toString("utf8"));
+
+  if (!payload) {
+    return buffer;
+  }
+
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    encryptionKey(),
+    Buffer.from(payload.iv, "base64url"),
+  );
+  decipher.setAuthTag(Buffer.from(payload.tag, "base64url"));
+
+  return Buffer.concat([
+    decipher.update(Buffer.from(payload.data, "base64url")),
+    decipher.final(),
+  ]);
+}
+
+function encryptText(value: string): string {
+  return encryptBuffer(Buffer.from(value, "utf8")).toString("utf8");
+}
+
+function decryptText(value: string): string {
+  return decryptBuffer(Buffer.from(value, "utf8")).toString("utf8");
+}
+
+function parseEncryptedPayload(value: string): EncryptedPayload | null {
+  try {
+    const payload = JSON.parse(value) as Partial<EncryptedPayload>;
+
+    if (
+      payload.version !== ENCRYPTED_PAYLOAD_VERSION ||
+      typeof payload.iv !== "string" ||
+      typeof payload.tag !== "string" ||
+      typeof payload.data !== "string"
+    ) {
+      return null;
+    }
+
+    return payload as EncryptedPayload;
+  } catch {
+    return null;
+  }
 }
 
 async function streamToBuffer(

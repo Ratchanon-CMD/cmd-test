@@ -88,12 +88,14 @@ ADMIN_USERNAME="admin"
 ADMIN_PASSWORD="change-me"
 NEXT_PUBLIC_APP_NAME="CMD Event Registration"
 BLOB_READ_WRITE_TOKEN=""
-BLOB_ACCESS="private"
+BLOB_ACCESS="public"
 ```
 
 For Vercel production, connect a Vercel Blob store to the project so
 `BLOB_READ_WRITE_TOKEN` is set. Without it, Vercel only has ephemeral `/tmp`
-storage and registrations may not appear across different routes.
+storage and registrations may not appear across different routes. Public Blob
+stores are supported; registration metadata and uploaded documents are
+encrypted before being written to Blob storage.
 
 ### Main flows
 
