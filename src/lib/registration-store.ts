@@ -59,6 +59,11 @@ type RegistrationDocumentLookup = {
   document: StoredDocumentView;
 };
 
+type BlobDownload = {
+  statusCode: 200;
+  stream: ReadableStream<Uint8Array>;
+};
+
 type EncryptedPayload = {
   version: typeof ENCRYPTED_PAYLOAD_VERSION;
   iv: string;
@@ -474,13 +479,26 @@ async function withBlobAccess<T>(
 async function getBlob(
   pathname: string,
   options: { useCache?: boolean } = {},
-): ReturnType<typeof get> {
-  return withBlobAccess((access) =>
-    get(pathname, {
+): Promise<BlobDownload | null> {
+  return withBlobAccess(async (access) => {
+    if (access === "public") {
+      return getPublicBlobByPathname(pathname);
+    }
+
+    const blob = await get(pathname, {
       access,
       useCache: options.useCache,
-    }),
-  );
+    });
+
+    if (!blob || blob.statusCode !== 200) {
+      return null;
+    }
+
+    return {
+      statusCode: 200,
+      stream: blob.stream,
+    };
+  });
 }
 
 async function putBlob(
@@ -499,6 +517,33 @@ async function putBlob(
       contentType: options.contentType,
     }),
   );
+}
+
+async function getPublicBlobByPathname(
+  pathname: string,
+): Promise<BlobDownload | null> {
+  const page = await list({
+    prefix: pathname,
+    limit: 10,
+  });
+  const blob = page.blobs.find((candidate) => candidate.pathname === pathname);
+
+  if (!blob) {
+    return null;
+  }
+
+  const response = await fetch(blob.url, {
+    cache: "no-store",
+  });
+
+  if (!response.ok || !response.body) {
+    return null;
+  }
+
+  return {
+    statusCode: 200,
+    stream: response.body,
+  };
 }
 
 function blobRegistrationPath(id: string): string {
