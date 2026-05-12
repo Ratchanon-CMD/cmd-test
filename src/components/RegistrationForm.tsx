@@ -18,11 +18,12 @@ export function RegistrationForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setIsSubmitting(true);
     setError("");
     setRegistration(null);
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     const response = await fetch("/api/registrations", {
       method: "POST",
       body: formData
@@ -36,7 +37,7 @@ export function RegistrationForm() {
       return;
     }
 
-    event.currentTarget.reset();
+    form.reset();
     setRegistration(payload.data);
   }
 

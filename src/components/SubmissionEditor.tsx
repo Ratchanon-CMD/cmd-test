@@ -70,11 +70,12 @@ export function SubmissionEditor({
 
   async function handleDocumentsSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setIsUploading(true);
     setMessage("");
     setError("");
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     const response = await fetch("/api/submissions/me/documents", {
       method: "POST",
       body: formData
@@ -88,7 +89,7 @@ export function SubmissionEditor({
       return;
     }
 
-    event.currentTarget.reset();
+    form.reset();
     setRegistration(payload.data);
     setMessage("Documents updated");
   }
