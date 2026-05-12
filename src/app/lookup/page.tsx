@@ -2,8 +2,8 @@ import { LookupForm } from "@/components/LookupForm";
 
 export default function LookupPage() {
   return (
-    <div className="mx-auto max-w-xl">
-      <div className="mb-6">
+    <div className="mx-auto max-w-6xl">
+      <div className="mb-6 max-w-xl">
         <h1 className="text-3xl font-bold text-slate-950">
           View or edit submission
         </h1>

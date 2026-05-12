@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
 import { jsonError, jsonSuccess } from "@/lib/responses";
+import { serializeRegistration } from "@/lib/serializers";
 import { createSessionToken, SUBMISSION_COOKIE } from "@/lib/session";
 import { submissionLoginSchema } from "@/lib/validation";
 
@@ -14,14 +15,21 @@ export async function POST(request: NextRequest) {
 
   if (!parsed.success) {
     return jsonError("Invalid login data", 422, {
-      issues: parsed.error.flatten().fieldErrors
+      issues: parsed.error.flatten().fieldErrors,
     });
   }
 
   const registration = await prisma.registration.findUnique({
     where: {
-      referenceCode: parsed.data.referenceCode.trim().toUpperCase()
-    }
+      referenceCode: parsed.data.referenceCode.trim().toUpperCase(),
+    },
+    include: {
+      documents: {
+        orderBy: {
+          uploadedAt: "desc",
+        },
+      },
+    },
   });
 
   if (!registration) {
@@ -30,7 +38,7 @@ export async function POST(request: NextRequest) {
 
   const passwordMatches = await verifyPassword(
     parsed.data.password,
-    registration.passwordHash
+    registration.passwordHash,
   );
 
   if (!passwordMatches) {
@@ -38,10 +46,8 @@ export async function POST(request: NextRequest) {
   }
 
   const response = jsonSuccess(
-    {
-      referenceCode: registration.referenceCode
-    },
-    "Submission unlocked"
+    serializeRegistration(registration),
+    "Submission unlocked",
   );
 
   response.cookies.set(
@@ -52,8 +58,8 @@ export async function POST(request: NextRequest) {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: 60 * 60 * 4
-    }
+      maxAge: 60 * 60 * 4,
+    },
   );
 
   return response;
