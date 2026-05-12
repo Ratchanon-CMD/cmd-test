@@ -56,8 +56,8 @@ export default async function AdminRegistrationsPage({
 
       {isEphemeralVercelStorage() ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-          Production storage is not configured. Add a Vercel Blob store so
-          registrations persist across Vercel serverless functions.
+          Document storage is not configured. Add a Vercel Blob store so
+          uploaded documents persist across Vercel serverless functions.
         </div>
       ) : null}
 

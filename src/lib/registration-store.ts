@@ -59,6 +59,15 @@ type RegistrationDocumentLookup = {
   document: StoredDocumentView;
 };
 
+type DocumentCreateInput = {
+  id?: string;
+  fileName: string;
+  storagePath: string;
+  mimeType: string;
+  size: number;
+  uploadedAt?: string;
+};
+
 type BlobDownload = {
   statusCode: 200;
   stream: ReadableStream<Uint8Array>;
@@ -75,6 +84,19 @@ let resolvedBlobAccess: BlobAccessType | null = null;
 
 export function isBlobStoreEnabled(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+}
+
+function isPostgresDatabaseEnabled(): boolean {
+  const databaseUrl = process.env.DATABASE_URL;
+  return Boolean(
+    databaseUrl &&
+      (databaseUrl.startsWith("postgresql://") ||
+        databaseUrl.startsWith("postgres://")),
+  );
+}
+
+function shouldUseBlobRegistrationStore(): boolean {
+  return isBlobStoreEnabled() && !isPostgresDatabaseEnabled();
 }
 
 export function isEphemeralVercelStorage(): boolean {
@@ -110,7 +132,7 @@ export async function createRegistration(
   input: RegistrationInput,
   files: File[],
 ): Promise<RegistrationView> {
-  if (isBlobStoreEnabled()) {
+  if (shouldUseBlobRegistrationStore()) {
     const registration = await createBlobRegistration(input, files);
     return serializeStoredRegistration(registration);
   }
@@ -124,7 +146,7 @@ export async function findRegistrationByReferenceCode(
 ): Promise<StoredRegistration | null> {
   const normalizedReferenceCode = referenceCode.trim().toUpperCase();
 
-  if (isBlobStoreEnabled()) {
+  if (shouldUseBlobRegistrationStore()) {
     return findBlobRegistrationByReferenceCode(normalizedReferenceCode);
   }
 
@@ -148,7 +170,7 @@ export async function findRegistrationByReferenceCode(
 export async function findRegistrationById(
   id: string,
 ): Promise<StoredRegistration | null> {
-  if (isBlobStoreEnabled()) {
+  if (shouldUseBlobRegistrationStore()) {
     return findBlobRegistrationById(id);
   }
 
@@ -172,7 +194,7 @@ export async function findRegistrationById(
 export async function listRegistrations(
   query?: string,
 ): Promise<StoredRegistration[]> {
-  if (isBlobStoreEnabled()) {
+  if (shouldUseBlobRegistrationStore()) {
     return listBlobRegistrations(query);
   }
 
@@ -207,7 +229,7 @@ export async function updateRegistrationByReferenceCode(
   referenceCode: string,
   input: RegistrationUpdateInput,
 ): Promise<RegistrationView | null> {
-  if (isBlobStoreEnabled()) {
+  if (shouldUseBlobRegistrationStore()) {
     const registration = await updateBlobRegistrationByReferenceCode(
       referenceCode,
       input,
@@ -238,7 +260,7 @@ export async function updateRegistrationDocuments(
   files: File[],
   replaceExisting: boolean,
 ): Promise<RegistrationView | null> {
-  if (isBlobStoreEnabled()) {
+  if (shouldUseBlobRegistrationStore()) {
     const registration = await updateBlobRegistrationDocuments(
       referenceCode,
       files,
@@ -257,12 +279,15 @@ export async function updateRegistrationDocuments(
     return null;
   }
 
-  const savedDocuments = await saveUploadedDocuments(files, referenceCode);
+  const savedDocuments = await savePersistentUploadedDocuments(
+    files,
+    referenceCode,
+  );
 
   if (replaceExisting) {
     await Promise.all(
       existingRegistration.documents.map((document) =>
-        removeStoredDocument(document.storagePath),
+        removePersistentDocument(document.storagePath),
       ),
     );
     await prisma.registrationDocument.deleteMany({
@@ -294,7 +319,7 @@ export async function updateRegistrationDocuments(
 export async function findRegistrationDocument(
   documentId: string,
 ): Promise<RegistrationDocumentLookup | null> {
-  if (isBlobStoreEnabled()) {
+  if (shouldUseBlobRegistrationStore()) {
     return findBlobRegistrationDocument(documentId);
   }
 
@@ -393,6 +418,26 @@ function mapPrismaDocument(
   };
 }
 
+async function savePersistentUploadedDocuments(
+  files: File[],
+  referenceCode: string,
+): Promise<DocumentCreateInput[]> {
+  if (isBlobStoreEnabled()) {
+    return saveBlobUploadedDocuments(files, referenceCode);
+  }
+
+  return saveUploadedDocuments(files, referenceCode);
+}
+
+async function removePersistentDocument(storagePath: string): Promise<void> {
+  if (isBlobStoreEnabled()) {
+    await del(storagePath);
+    return;
+  }
+
+  await removeStoredDocument(storagePath);
+}
+
 async function createLocalRegistration(
   input: RegistrationInput,
   files: File[],
@@ -403,7 +448,10 @@ async function createLocalRegistration(
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const referenceCode = generateReferenceCode();
-    const savedDocuments = await saveUploadedDocuments(files, referenceCode);
+    const savedDocuments = await savePersistentUploadedDocuments(
+      files,
+      referenceCode,
+    );
 
     try {
       const registration = await prisma.registration.create({

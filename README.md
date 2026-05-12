@@ -52,10 +52,10 @@ This repo implements the event registration system as a single Next.js app with 
 
 - Next.js App Router + React + TypeScript
 - Tailwind CSS
-- Prisma + SQLite
+- Prisma + PostgreSQL
 - bcryptjs for participant password hashing
 - Signed HTTP-only cookies for participant/admin sessions
-- Local file storage under `uploads/`
+- Vercel Blob for uploaded document storage when configured
 - PDFKit for name tag PDF generation
 - Vitest for focused tests
 
@@ -82,7 +82,7 @@ Change these before deployment.
 ### Required environment variables
 
 ```text
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE"
 SESSION_SECRET="replace-with-a-long-random-secret"
 ADMIN_USERNAME="admin"
 ADMIN_PASSWORD="change-me"
@@ -91,11 +91,10 @@ BLOB_READ_WRITE_TOKEN=""
 BLOB_ACCESS="public"
 ```
 
-For Vercel production, connect a Vercel Blob store to the project so
-`BLOB_READ_WRITE_TOKEN` is set. Without it, Vercel only has ephemeral `/tmp`
-storage and registrations may not appear across different routes. Public Blob
-stores are supported; registration metadata and uploaded documents are
-encrypted before being written to Blob storage.
+Use a persistent PostgreSQL database for registration metadata. On Vercel,
+connect a Vercel Blob store so `BLOB_READ_WRITE_TOKEN` is set for uploaded
+documents. Public Blob stores are supported; uploaded documents are encrypted
+before being written to Blob storage.
 
 ### Main flows
 
@@ -117,7 +116,6 @@ npm run build
 
 ### Deployment note
 
-The app uses SQLite and local file storage for local development. On Vercel,
-it uses Vercel Blob when `BLOB_READ_WRITE_TOKEN` is configured, storing both
-registration metadata and uploaded documents in Blob storage. Deployments
-without a persistent storage integration will show a warning in the admin list.
+The app stores registration metadata in PostgreSQL via Prisma. Uploaded
+documents are stored in Vercel Blob when `BLOB_READ_WRITE_TOKEN` is configured;
+without Blob, local development falls back to `uploads/`.
